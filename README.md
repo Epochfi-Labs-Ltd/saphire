@@ -99,3 +99,7 @@ tests/                   TypeScript integration tests, fixture, lifecycle E2E
 keeper/                  settle/unwind cron and SOFR fixing script
 docs/                    this README's diagrams and the markdown docs
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE). The on-chain program, SDK, keeper and tests are open source; an operator's pricing engine is its own.

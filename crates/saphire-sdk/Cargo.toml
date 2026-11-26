@@ -1,0 +1,12 @@
+[package]
+name = "saphire-sdk"
+version = "0.1.0"
+description = "Thin Rust client for Saphire: PDA derivation, instruction builders, signed-deal encoding."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+anchor-lang = { workspace = true }
+anchor-spl = { workspace = true }
+saphire = { workspace = true }

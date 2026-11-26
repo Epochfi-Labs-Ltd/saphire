@@ -1,0 +1,23 @@
+[package]
+name = "saphire-tests"
+version = "0.1.0"
+description = "LiteSVM integration tests for Saphire: fixture, one module per instruction card, lifecycle E2E."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+anchor-lang = { workspace = true }
+anchor-spl = { workspace = true }
+fra_math = { workspace = true }
+saphire = { workspace = true }
+saphire-sdk = { workspace = true }
+litesvm = { workspace = true }
+solana-account = "4"
+solana-instruction-error = "2"
+solana-keypair = { workspace = true }
+solana-message = { workspace = true }
+solana-signer = { workspace = true }
+solana-transaction = { workspace = true }
+solana-transaction-error = "3"

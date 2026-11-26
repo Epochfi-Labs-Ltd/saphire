@@ -104,4 +104,4 @@ docs/                    this README's diagrams and the markdown docs
 
 ## License
 
-MIT — see [LICENSE](LICENSE). The on-chain program, SDK, keeper and tests are open source; an operator's pricing engine is its own.
+MIT — see [LICENSE](LICENSE). The on-chain program, generated client, keeper and tests are open source; an operator's pricing engine is its own.

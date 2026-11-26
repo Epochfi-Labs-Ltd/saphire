@@ -1,4 +1,7 @@
 //! PDA derivation, one fn per account. Each returns `(address, bump)`.
+//!
+//! The Codama client takes every account explicitly, so the tests derive
+//! addresses here from the seeds in `saphire::constants`.
 
 use anchor_lang::prelude::Pubkey;
 use saphire::constants::*;
@@ -91,24 +94,4 @@ pub fn used_nonce(market: &Pubkey, trader: &Pubkey, nonce: u64) -> (Pubkey, u8) 
 /// `[b"rate", market, date_le]`
 pub fn daily_rate(market: &Pubkey, date: i64) -> (Pubkey, u8) {
     find(&[SEED_RATE, market.as_ref(), &date.to_le_bytes()])
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn daily_rate_matches_program_helper() {
-        let market = Pubkey::new_unique();
-        assert_eq!(
-            daily_rate(&market, 1_767_571_200),
-            saphire::DailyRate::pda(&market, 1_767_571_200)
-        );
-    }
-
-    #[test]
-    fn position_seeds_use_little_endian_count() {
-        let (m, t) = (Pubkey::new_unique(), Pubkey::new_unique());
-        assert_ne!(position(&m, &t, 1).0, position(&m, &t, 256).0);
-    }
 }

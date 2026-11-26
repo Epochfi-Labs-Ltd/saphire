@@ -1,5 +1,5 @@
 [workspace]
-members = ["programs/*", "crates/*", "tests", "keeper"]
+members = ["programs/*", "crates/*", "clients/rust", "tests", "keeper"]
 resolver = "3"
 
 [workspace.package]
@@ -12,7 +12,7 @@ anchor-lang = "1.2.2"
 anchor-spl = { version = "1.2.2", default-features = false, features = ["token", "token_2022", "mint", "solana-v3"] }
 fra_math = { path = "crates/fra_math" }
 saphire = { path = "programs/saphire", features = ["no-entrypoint"] }
-saphire-sdk = { path = "crates/saphire-sdk" }
+saphire-client = { path = "clients/rust" }
 # Cargo.lock pins LiteSVM's Rust-1.89-compatible dependency graph (from the Anchor 1.2.2 template).
 litesvm = "0.15.0"
 solana-keypair = "3"

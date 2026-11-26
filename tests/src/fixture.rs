@@ -2,8 +2,9 @@
 //!
 //! Loads `target/deploy/saphire.so` (run `anchor build` first), creates the
 //! settlement mint and token accounts by writing SPL state directly (so the
-//! same fixture works for SPL Token and Token-2022), and wraps the SDK
-//! builders in the setup steps the instruction tests share.
+//! same fixture works for SPL Token and Token-2022), and wraps the Codama
+//! client's instruction builders in the setup steps the instruction tests
+//! share.
 
 use anchor_lang::{
     error::ErrorCode as AnchorErrorCode,
@@ -20,9 +21,9 @@ use litesvm::{
 };
 use saphire::{
     Config, DailyRate, Eligibility, FraError, Market, MarketParams, MarketStatus, Position, Quote,
-    Reserve, Side, SignedDeal, TraderMargin, UsedNonce,
+    Reserve, SignedDeal, TraderMargin, UsedNonce,
 };
-use saphire_sdk::{deal, ix, pda, MarketRef, TOKEN_PROGRAM_ID};
+use saphire_client::{instructions as ix, types::Side};
 use solana_account::Account;
 use solana_instruction_error::InstructionError;
 use solana_keypair::Keypair;
@@ -31,7 +32,14 @@ use solana_signer::Signer;
 use solana_transaction::versioned::VersionedTransaction;
 use solana_transaction_error::TransactionError;
 
+use crate::{deal, pda};
+
 pub type TxResult = TransactionResult;
+
+/// SPL Token program id.
+pub const TOKEN_PROGRAM_ID: Pubkey = anchor_spl::token::ID;
+/// Token-2022 program id.
+pub const TOKEN_2022_PROGRAM_ID: Pubkey = anchor_spl::token_2022::ID;
 
 // ── Units and defaults ─────────────────────────────────────────────────────
 
@@ -100,6 +108,15 @@ pub struct TestEnv {
     pub params: MarketParams,
 }
 
+/// Everything a market-scoped instruction needs to know about the market.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MarketRef {
+    pub market: Pubkey,
+    pub settlement_mint: Pubkey,
+    /// SPL Token or Token-2022, whichever owns `settlement_mint`.
+    pub token_program: Pubkey,
+}
+
 pub struct TestTrader {
     pub kp: Keypair,
     pub token_account: Pubkey,
@@ -133,7 +150,7 @@ impl TestEnv {
     }
 
     /// As [`TestEnv::new`] with the settlement mint owned by `token_program`
-    /// (pass `saphire_sdk::TOKEN_2022_PROGRAM_ID` for Token-2022).
+    /// (pass [`TOKEN_2022_PROGRAM_ID`] for Token-2022).
     pub fn with_token_program(token_program: Pubkey) -> Self {
         let mut svm = LiteSVM::new();
         svm.add_program(saphire::ID, &program_bytes())
@@ -323,17 +340,21 @@ impl TestEnv {
     }
 
     pub fn market_ref(&self) -> MarketRef {
-        MarketRef::new(
-            self.params.benchmark_id,
-            self.mint,
-            self.params.start_offset_months,
-            self.params.tenor_months,
-            self.token_program,
-        )
+        MarketRef {
+            market: self.market(),
+            settlement_mint: self.mint,
+            token_program: self.token_program,
+        }
     }
 
     pub fn market(&self) -> Pubkey {
-        self.market_ref().market
+        pda::market(
+            self.params.benchmark_id,
+            &self.mint,
+            self.params.start_offset_months,
+            self.params.tenor_months,
+        )
+        .0
     }
 
     pub fn config_state(&self) -> Config {
@@ -397,21 +418,55 @@ impl TestEnv {
         self.svm.set_account(address, account).expect("set market");
     }
 
-    // ── Builders bound to this env ─────────────────────────────────────────
+    // ── Instructions (Codama builders, PDAs filled in) ─────────────────────
 
+    /// `open_position` for the next position slot (`Market.position_count`).
     pub fn ix_open_position(&self, trader: &Pubkey, side: Side, notional: u64) -> Instruction {
+        let m = self.market_ref();
         let count = self.market_state().position_count;
-        ix::open_position(trader, &self.market_ref(), count, side, notional)
+        ix::OpenPositionBuilder::new()
+            .trader(*trader)
+            .config(pda::config().0)
+            .market(m.market)
+            .quote(pda::quote(&m.market).0)
+            .eligibility(pda::eligibility(&m.market, trader).0)
+            .trader_margin(pda::trader_margin(&m.market, trader).0)
+            .margin_vault(pda::margin_vault(&m.market, trader).0)
+            .reserve(pda::reserve(&m.market).0)
+            .fee_vault(pda::fee_vault().0)
+            .position(pda::position(&m.market, trader, count).0)
+            .settlement_mint(m.settlement_mint)
+            .token_program(m.token_program)
+            .side(side)
+            .notional(notional)
+            .instruction()
     }
 
-    pub fn position_ref(&self, trader: &Pubkey, nonce: u64) -> ix::PositionRef {
-        let p = self.position_state(trader, nonce);
-        ix::PositionRef {
-            trader: *trader,
-            nonce,
-            period_start: p.period_start,
-            period_end: p.period_end,
-        }
+    /// `open_position_signed` for the next position slot, submitting `deal`.
+    pub fn ix_open_position_signed(&self, trader: &Pubkey, deal: &SignedDeal) -> Instruction {
+        let m = self.market_ref();
+        let count = self.market_state().position_count;
+        ix::OpenPositionSignedBuilder::new()
+            .trader(*trader)
+            .config(pda::config().0)
+            .market(m.market)
+            .eligibility(pda::eligibility(&m.market, trader).0)
+            .trader_margin(pda::trader_margin(&m.market, trader).0)
+            .margin_vault(pda::margin_vault(&m.market, trader).0)
+            .reserve(pda::reserve(&m.market).0)
+            .fee_vault(pda::fee_vault().0)
+            .position(pda::position(&m.market, trader, count).0)
+            .used_nonce(pda::used_nonce(&m.market, trader, deal.nonce).0)
+            .settlement_mint(m.settlement_mint)
+            .token_program(m.token_program)
+            .side(client_side(deal.side))
+            .notional(deal.notional)
+            .fixed_rate(deal.fixed_rate)
+            .period_start(deal.period_start)
+            .period_end(deal.period_end)
+            .expires_at(deal.expires_at)
+            .nonce(deal.nonce)
+            .instruction()
     }
 
     /// Period a position opened now would get: `derive_period(now, offset,
@@ -438,16 +493,26 @@ pub fn setup_config() -> TestEnv {
 
 fn init_config(env: &mut TestEnv) {
     let admin = env.admin.insecure_clone();
-    env.send_ok(
-        &[ix::initialize_config(
-            &admin.pubkey(),
-            &env.mint,
-            &env.token_program,
-            PROTOCOL_FEE_BPS,
-            RATE_CEILING,
-        )],
-        &[&admin],
-    );
+    let ix = ix_initialize_config(env, &admin.pubkey(), PROTOCOL_FEE_BPS, RATE_CEILING);
+    env.send_ok(&[ix], &[&admin]);
+}
+
+/// `initialize_config` for the env's settlement mint and token program.
+pub fn ix_initialize_config(
+    env: &TestEnv,
+    authority: &Pubkey,
+    protocol_fee_bps: u16,
+    rate_ceiling: u64,
+) -> Instruction {
+    ix::InitializeConfigBuilder::new()
+        .authority(*authority)
+        .config(pda::config().0)
+        .fee_vault(pda::fee_vault().0)
+        .settlement_mint(env.mint)
+        .token_program(env.token_program)
+        .protocol_fee_bps(protocol_fee_bps)
+        .rate_ceiling(rate_ceiling)
+        .instruction()
 }
 
 /// IX-01 + IX-03 + IX-05: config, registered operator, one market with
@@ -462,17 +527,44 @@ pub fn setup_fra_market_with(params: MarketParams) -> TestEnv {
     env.params = params;
     let admin = env.admin.insecure_clone();
     let operator = env.operator.insecure_clone();
-    env.send_ok(
-        &[ix::register_operator(&admin.pubkey(), &operator.pubkey())],
-        &[&admin],
-    );
-    let create = ix::create_market(
-        &operator.pubkey(),
-        &env.mint,
-        &env.token_program,
-        env.params.clone(),
-        &env.keeper,
-    );
+    let register = ix::RegisterOperatorBuilder::new()
+        .authority(admin.pubkey())
+        .config(pda::config().0)
+        .operator(operator.pubkey())
+        .operator_registration(pda::operator_registration(&operator.pubkey()).0)
+        .instruction();
+    env.send_ok(&[register], &[&admin]);
+
+    let market = env.market();
+    let p = &env.params;
+    let create = ix::CreateMarketBuilder::new()
+        .operator(operator.pubkey())
+        .config(pda::config().0)
+        .operator_registration(pda::operator_registration(&operator.pubkey()).0)
+        .settlement_mint(env.mint)
+        .market(market)
+        .reserve(pda::reserve(&market).0)
+        .reserve_vault(pda::reserve_vault(&market).0)
+        .quote(pda::quote(&market).0)
+        .token_program(env.token_program)
+        .benchmark_id(p.benchmark_id)
+        .start_offset_months(p.start_offset_months)
+        .tenor_months(p.tenor_months)
+        .day_count_basis(p.day_count_basis)
+        .business_day_convention(p.business_day_convention)
+        .initial_margin_bps(p.initial_margin_bps)
+        .operator_commit_bps(p.operator_commit_bps)
+        .min_notional(p.min_notional)
+        .max_notional(p.max_notional)
+        .open_interest_cap(p.open_interest_cap)
+        .quote_validity_secs(p.quote_validity_secs)
+        .rate_grace_days(p.rate_grace_days)
+        .early_close_fee_bps(p.early_close_fee_bps)
+        .max_half_spread_bps(p.max_half_spread_bps)
+        .index_start_date(p.index_start_date)
+        .settlement_fee(p.settlement_fee)
+        .keeper(env.keeper)
+        .instruction();
     env.send_ok(&[create], &[&operator]);
     env
 }
@@ -504,12 +596,17 @@ pub fn ready_trader(env: &mut TestEnv) -> TestTrader {
 /// IX-06 from the operator's token account.
 pub fn fund_test_reserve(env: &mut TestEnv, amount: u64) {
     let operator = env.operator.insecure_clone();
-    let ix = ix::fund_reserve(
-        &operator.pubkey(),
-        &env.market_ref(),
-        &env.operator_token_account,
-        amount,
-    );
+    let m = env.market_ref();
+    let ix = ix::FundReserveBuilder::new()
+        .operator(operator.pubkey())
+        .market(m.market)
+        .reserve(pda::reserve(&m.market).0)
+        .reserve_vault(pda::reserve_vault(&m.market).0)
+        .operator_token_account(env.operator_token_account)
+        .settlement_mint(m.settlement_mint)
+        .token_program(m.token_program)
+        .amount(amount)
+        .instruction();
     env.send_ok(&[ix], &[&operator]);
 }
 
@@ -521,13 +618,16 @@ pub fn publish_test_quote(env: &mut TestEnv) {
 
 pub fn publish_quote_with(env: &mut TestEnv, mid: u64, half_spread_bps: u16, max_notional: u64) {
     let operator = env.operator.insecure_clone();
-    let ix = ix::publish_quote(
-        &operator.pubkey(),
-        &env.market(),
-        mid,
-        half_spread_bps,
-        max_notional,
-    );
+    let market = env.market();
+    let ix = ix::PublishQuoteBuilder::new()
+        .operator(operator.pubkey())
+        .config(pda::config().0)
+        .market(market)
+        .quote(pda::quote(&market).0)
+        .fixed_mid(mid)
+        .half_spread_bps(half_spread_bps)
+        .max_notional_at_quote(max_notional)
+        .instruction();
     env.send_ok(&[ix], &[&operator]);
 }
 
@@ -537,14 +637,14 @@ pub fn admit_test_trader(env: &mut TestEnv) -> TestTrader {
     let kp = env.new_funded_keypair();
     let token_account = env.create_token_account(&kp.pubkey(), TRADER_STARTING_USDC);
     let operator = env.operator.insecure_clone();
-    env.send_ok(
-        &[ix::admit_trader(
-            &operator.pubkey(),
-            &env.market(),
-            &kp.pubkey(),
-        )],
-        &[&operator],
-    );
+    let market = env.market();
+    let admit = ix::AdmitTraderBuilder::new()
+        .operator(operator.pubkey())
+        .market(market)
+        .trader(kp.pubkey())
+        .eligibility(pda::eligibility(&market, &kp.pubkey()).0)
+        .instruction();
+    env.send_ok(&[admit], &[&operator]);
     TestTrader { kp, token_account }
 }
 
@@ -552,20 +652,30 @@ pub fn admit_test_trader(env: &mut TestEnv) -> TestTrader {
 pub fn setup_eligible_trader_with_margin(env: &mut TestEnv, margin: u64) -> TestTrader {
     let trader = admit_test_trader(env);
     let m = env.market_ref();
-    env.send_ok(
-        &[ix::init_trader_margin(&trader.pubkey(), &m)],
-        &[&trader.kp],
-    );
+    let t = trader.pubkey();
+    let init = ix::InitTraderMarginBuilder::new()
+        .trader(t)
+        .market(m.market)
+        .eligibility(pda::eligibility(&m.market, &t).0)
+        .trader_margin(pda::trader_margin(&m.market, &t).0)
+        .margin_vault(pda::margin_vault(&m.market, &t).0)
+        .settlement_mint(m.settlement_mint)
+        .token_program(m.token_program)
+        .instruction();
+    env.send_ok(&[init], &[&trader.kp]);
     if margin > 0 {
-        env.send_ok(
-            &[ix::deposit_margin(
-                &trader.pubkey(),
-                &m,
-                &trader.token_account,
-                margin,
-            )],
-            &[&trader.kp],
-        );
+        let deposit = ix::DepositMarginBuilder::new()
+            .trader(t)
+            .market(m.market)
+            .eligibility(pda::eligibility(&m.market, &t).0)
+            .trader_margin(pda::trader_margin(&m.market, &t).0)
+            .margin_vault(pda::margin_vault(&m.market, &t).0)
+            .trader_token_account(trader.token_account)
+            .settlement_mint(m.settlement_mint)
+            .token_program(m.token_program)
+            .amount(margin)
+            .instruction();
+        env.send_ok(&[deposit], &[&trader.kp]);
     }
     trader
 }
@@ -591,7 +701,16 @@ pub fn publish_test_daily_rate(env: &mut TestEnv, date: i64, rate: u64) {
         fra_math::next_business_day(date, &fra_math::WeekendOnly).expect("next business day");
     let days_applied = fra_math::days_until(date, next).expect("days_applied");
     let operator = env.operator.insecure_clone();
-    let ix = ix::publish_daily_rate(&operator.pubkey(), &env.market(), date, rate, days_applied);
+    let market = env.market();
+    let ix = ix::PublishDailyRateBuilder::new()
+        .operator(operator.pubkey())
+        .config(pda::config().0)
+        .market(market)
+        .daily_rate(pda::daily_rate(&market, date).0)
+        .date(date)
+        .rate(rate)
+        .days_applied(days_applied)
+        .instruction();
     env.send_ok(&[ix], &[&operator]);
 }
 
@@ -630,7 +749,7 @@ pub fn warp_by(env: &mut TestEnv, secs: i64) {
 pub fn test_deal(env: &TestEnv, side: Side, notional: u64, nonce: u64) -> SignedDeal {
     let (period_start, period_end) = env.expected_period();
     SignedDeal {
-        side,
+        side: program_side(side),
         notional,
         fixed_rate: 40_650,
         period_start,
@@ -652,11 +771,26 @@ pub fn signed_deal_ixs(
     let market = env.market();
     let message = deal::deal_message_bytes(&market, trader, signed);
     let signature: [u8; 64] = signer.sign_message(&message).into();
-    let count = env.market_state().position_count;
     [
         deal::ed25519_verify_instruction(&signer.pubkey(), &signature, &message),
-        ix::open_position_signed(trader, &env.market_ref(), count, submitted),
+        env.ix_open_position_signed(trader, &submitted),
     ]
+}
+
+/// Program-side [`saphire::Side`] for a client [`Side`].
+pub fn program_side(side: Side) -> saphire::Side {
+    match side {
+        Side::PayFixed => saphire::Side::PayFixed,
+        Side::ReceiveFixed => saphire::Side::ReceiveFixed,
+    }
+}
+
+/// Client [`Side`] for a program-side [`saphire::Side`].
+pub fn client_side(side: saphire::Side) -> Side {
+    match side {
+        saphire::Side::PayFixed => Side::PayFixed,
+        saphire::Side::ReceiveFixed => Side::ReceiveFixed,
+    }
 }
 
 // ── Error assertions ───────────────────────────────────────────────────────
@@ -718,31 +852,4 @@ pub fn assert_custom_err(res: &TxResult, code: u32) {
 #[track_caller]
 pub fn assert_ok(res: &TxResult) {
     assert!(res.is_ok(), "expected success, got {}", describe(res));
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn warp_to_sets_clock() {
-        let mut env = TestEnv::new();
-        assert_eq!(env.now(), START_TS);
-        warp_to(&mut env, START_TS + 1_000);
-        assert_eq!(env.now(), START_TS + 1_000);
-    }
-
-    #[test]
-    fn token_accounts_are_written_with_balance() {
-        let env = TestEnv::new();
-        assert_eq!(
-            env.token_balance(&env.operator_token_account),
-            OPERATOR_STARTING_USDC
-        );
-        assert_eq!(
-            env.token_owner(&env.operator_token_account),
-            env.operator.pubkey()
-        );
-        assert_eq!(env.token_mint(&env.operator_token_account), env.mint);
-    }
 }

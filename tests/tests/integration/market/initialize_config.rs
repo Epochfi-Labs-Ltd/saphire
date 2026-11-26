@@ -2,20 +2,12 @@
 //! the happy-path tests run, the validation tests are stubs.
 // TODO(A): fill in the validation stubs once IX-01 validation lands.
 
-use saphire_sdk::{ix, pda, TOKEN_2022_PROGRAM_ID};
+use saphire_tests::{fixture::*, pda};
 use solana_signer::Signer;
-
-use crate::fixture::*;
 
 fn init(env: &mut TestEnv, fee_bps: u16, rate_ceiling: u64) -> TxResult {
     let admin = env.admin.insecure_clone();
-    let ix = ix::initialize_config(
-        &admin.pubkey(),
-        &env.mint,
-        &env.token_program,
-        fee_bps,
-        rate_ceiling,
-    );
+    let ix = ix_initialize_config(env, &admin.pubkey(), fee_bps, rate_ceiling);
     env.send(&[ix], &[&admin])
 }
 

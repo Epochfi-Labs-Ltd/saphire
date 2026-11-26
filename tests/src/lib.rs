@@ -1,65 +1,25 @@
-//! Saphire integration tests (LiteSVM). Run `anchor build` first: the
-//! fixture loads `target/deploy/saphire.so`.
+//! Shared support for the Saphire tests. The tests themselves live in two
+//! targets next to this crate:
 //!
-//! One module per instruction card. Tests for unimplemented handlers are
-//! named stubs, `#[ignore]`d with a `TODO(<segment>)` note; run them with
-//! `cargo test -p saphire-tests -- --ignored` once filled in.
+//! - `tests/unit/`: pure checks with no SVM, e.g. PDA seeds, signed-deal
+//!   encoding, and that the Codama client matches the program's IDL.
+//!   `cargo test -p saphire-tests --test unit`
+//! - `tests/integration/`: LiteSVM tests, one module per instruction,
+//!   grouped as in `programs/saphire/src/instructions/` (market, positions,
+//!   settlement), plus the lifecycle E2E.
+//!   `cargo test -p saphire-tests --test integration`
+//!
+//! Integration tests load `target/deploy/saphire.so`: run `anchor build`
+//! first. Tests for unimplemented handlers are named stubs, `#[ignore]`d with
+//! a `TODO(<segment>)` note; run them with `-- --ignored` once filled in.
+//!
+//! Instructions are built with the Codama-generated `saphire-client`; the
+//! helpers here only fill in the PDAs it expects to be passed.
 
 // LiteSVM's `TransactionResult` has a large `Err` variant; it is the
 // library's type, so the lint is allowed here rather than boxed per call.
 #![allow(clippy::result_large_err)]
 
+pub mod deal;
 pub mod fixture;
-
-#[cfg(test)]
-mod ix01_initialize_config;
-#[cfg(test)]
-mod ix02_update_config;
-#[cfg(test)]
-mod ix03_register_operator;
-#[cfg(test)]
-mod ix04_deactivate_operator;
-#[cfg(test)]
-mod ix05_create_market;
-#[cfg(test)]
-mod ix06_fund_reserve;
-#[cfg(test)]
-mod ix07_withdraw_reserve;
-#[cfg(test)]
-mod ix08_publish_quote;
-#[cfg(test)]
-mod ix09_admit_trader;
-#[cfg(test)]
-mod ix10_suspend_trader;
-#[cfg(test)]
-mod ix11_init_trader_margin;
-#[cfg(test)]
-mod ix12_deposit_margin;
-#[cfg(test)]
-mod ix13_halt_market;
-#[cfg(test)]
-mod ix14_resume_market;
-#[cfg(test)]
-mod ix15_pause_program;
-#[cfg(test)]
-mod ix16_resume_program;
-#[cfg(test)]
-mod ix17_withdraw_margin;
-#[cfg(test)]
-mod ix18_open_position;
-#[cfg(test)]
-mod ix19_open_position_signed;
-#[cfg(test)]
-mod ix20_close_position;
-#[cfg(test)]
-mod ix21_publish_daily_rate;
-#[cfg(test)]
-mod ix22_settle_position;
-#[cfg(test)]
-mod ix23_unwind_position;
-#[cfg(test)]
-mod ix24_close_used_nonce;
-#[cfg(test)]
-mod ix25_withdraw_fees;
-#[cfg(test)]
-mod lifecycle;
+pub mod pda;

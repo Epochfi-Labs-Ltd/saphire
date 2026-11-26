@@ -1,5 +1,5 @@
 //! PDA seeds and protocol constants. Seeds mirror the account cards in
-//! docs/implementation.md; `crates/saphire-sdk` derives the same addresses.
+//! docs/implementation.md; `tests/src/pda.rs` derives the same addresses.
 
 // ── Account seeds (docs/implementation.md, "Account cards") ────────────────
 pub const SEED_CONFIG: &[u8] = b"config";

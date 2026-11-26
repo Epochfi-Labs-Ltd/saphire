@@ -1,12 +1,17 @@
-//! LiteSVM integration tests: one module per instruction, grouped as in
-//! `programs/saphire/src/instructions/`. Run `anchor build` first.
+//! Integration tests: instructions combined. Run `anchor build` first.
 //!
-//! `cargo test -p saphire-tests --test integration [market::|positions::|settlement::]`
+//! Each test drives a flow through several real instructions, building state
+//! with the fixture's `setup_*` / `ready_*` chains (which send the real
+//! instructions) rather than mocks. Single-instruction behaviour belongs in
+//! the unit tests (`tests/unit`).
+//!
+//! `cargo test -p saphire-tests --test integration`
 
 #![allow(clippy::result_large_err)]
 
-mod fixture;
+mod controls;
 mod lifecycle;
-mod market;
-mod positions;
+mod quote_trading;
+mod reserve_and_fees;
+mod rfq;
 mod settlement;

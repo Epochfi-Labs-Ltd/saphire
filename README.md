@@ -97,7 +97,7 @@ Markdown copies of these will live under `docs/` as they are finalised.
 ```
 programs/saphire/        Anchor program (segments A, B, C as modules)
 crates/fra_math/         shared pricing, date and rounding helpers
-tests/                   TypeScript integration tests, fixture, lifecycle E2E
+tests/                   Rust LiteSVM tests: unit (one instruction, mocked state), integration (flows, lifecycle E2E)
 keeper/                  settle/unwind cron and daily SOFR print script
 docs/                    this README's diagrams and the markdown docs
 ```

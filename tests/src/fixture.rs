@@ -5,12 +5,15 @@
 //! same fixture works for SPL Token and Token-2022), and wraps the Codama
 //! client's instruction builders in the setup steps the instruction tests
 //! share.
+//!
+//! The `setup_*` / `ready_*` steps below run real instructions and are for
+//! the integration tests. Unit tests mock state instead (`crate::mock`).
 
 use anchor_lang::{
     error::ErrorCode as AnchorErrorCode,
     prelude::{Clock, Pubkey},
     solana_program::{instruction::Instruction, program_option::COption, program_pack::Pack},
-    AccountDeserialize, AccountSerialize,
+    AccountDeserialize,
 };
 use anchor_spl::compat::spl_token_interface::state::{
     Account as SplTokenAccount, AccountState, Mint as SplMint,
@@ -252,6 +255,19 @@ impl TestEnv {
         amount: u64,
     ) -> Pubkey {
         let address = Keypair::new().pubkey();
+        self.write_token_account(address, mint, owner, amount);
+        address
+    }
+
+    /// Write an initialised token account at a fixed `address` (e.g. a vault
+    /// PDA), owned by `self.token_program`.
+    pub fn write_token_account(
+        &mut self,
+        address: Pubkey,
+        mint: &Pubkey,
+        owner: &Pubkey,
+        amount: u64,
+    ) {
         let state = SplTokenAccount {
             mint: *mint,
             owner: *owner,
@@ -265,7 +281,6 @@ impl TestEnv {
         let mut data = vec![0u8; SplTokenAccount::LEN];
         SplTokenAccount::pack(state, &mut data).expect("pack token account");
         self.set_token_owned_account(address, data);
-        address
     }
 
     fn set_token_owned_account(&mut self, address: Pubkey, data: Vec<u8>) {
@@ -411,11 +426,7 @@ impl TestEnv {
         let address = self.market();
         let mut market = self.market_state();
         market.status = status;
-        let mut account = self.svm.get_account(&address).expect("market account");
-        let mut data = Vec::with_capacity(account.data.len());
-        market.try_serialize(&mut data).expect("serialize market");
-        account.data[..data.len()].copy_from_slice(&data);
-        self.svm.set_account(address, account).expect("set market");
+        self.write_account(address, &market);
     }
 
     // ── Instructions (Codama builders, PDAs filled in) ─────────────────────
@@ -483,6 +494,10 @@ impl TestEnv {
 }
 
 // ── Setup steps (named as in the scaffolding brief) ────────────────────────
+//
+// These send the real instructions, so each one depends on every handler it
+// calls. Use them in the integration tests only; unit tests build the same
+// state with the `mock_*` builders in `crate::mock`.
 
 /// IX-01 only: Config + fee vault.
 pub fn setup_config() -> TestEnv {

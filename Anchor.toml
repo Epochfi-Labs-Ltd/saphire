@@ -1,0 +1,23 @@
+# Toolchain recorded from `avm install latest && avm use latest` on 2026-11-26.
+# See docs/toolchain.md. Bump all three together.
+[toolchain]
+anchor_version = "1.2.2"
+solana_version = "4.1.2"
+# Host rustc is pinned in rust-toolchain.toml (1.89.0); cargo-build-sbf 4.1.0
+# ships platform-tools v1.54 (rustc 1.89.0) for the SBF build.
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+saphire = "7DCT2pqaqtijF2kgN8jAa9Lbftzi1NiEmGAJ8SbWCMUv"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test --workspace"
+
+[hooks]

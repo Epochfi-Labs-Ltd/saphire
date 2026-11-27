@@ -1,0 +1,17 @@
+[package]
+name = "saphire-tests"
+version = "0.1.0"
+description = "Saphire tests: shared LiteSVM fixture (src/), per-instruction unit tests (tests/unit) and multi-instruction integration tests (tests/integration)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+anchor-lang = { workspace = true }
+saphire = { workspace = true }
+litesvm = { workspace = true }
+solana-keypair = { workspace = true }
+solana-message = { workspace = true }
+solana-signer = { workspace = true }
+solana-transaction = { workspace = true }

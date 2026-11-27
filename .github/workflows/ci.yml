@@ -1,0 +1,71 @@
+# Build, fmt, clippy and tests with the toolchain pinned in docs/toolchain.md.
+name: ci
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  RUST_VERSION: "1.89.0"     # rust-toolchain.toml
+  SOLANA_VERSION: "4.1.2"    # Anchor.toml [toolchain]
+  ANCHOR_VERSION: "1.2.2"    # Anchor.toml [toolchain]
+  ANCHOR_CLI_BUILD_RUST_VERSION: "1.100.0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libudev-dev libssl-dev
+
+      - name: Install Rust ${{ env.RUST_VERSION }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Cache Solana and Anchor CLIs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/solana
+            ~/.cargo/bin/anchor
+          key: solana-${{ env.SOLANA_VERSION }}-anchor-${{ env.ANCHOR_VERSION }}
+
+      - name: Install Solana CLI ${{ env.SOLANA_VERSION }}
+        run: |
+          if [ ! -x "$HOME/.local/share/solana/install/active_release/bin/solana" ]; then
+            sh -c "$(curl -sSfL https://release.anza.xyz/v${SOLANA_VERSION}/install)"
+          fi
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+
+      - name: Install Anchor CLI ${{ env.ANCHOR_VERSION }}
+        run: |
+          if ! anchor --version 2>/dev/null | grep -q "${ANCHOR_VERSION}"; then
+            rustup toolchain install "${ANCHOR_CLI_BUILD_RUST_VERSION}" --profile minimal
+            cargo +"${ANCHOR_CLI_BUILD_RUST_VERSION}" install --git https://github.com/solana-foundation/anchor --tag "v${ANCHOR_VERSION}" anchor-cli --locked --force
+          fi
+
+      - name: Versions
+        run: rustc --version && solana --version && anchor --version
+
+      - name: fmt
+        run: cargo fmt --all --check
+
+      - name: clippy
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: anchor build
+        run: anchor build
+
+      - name: test
+        run: cargo test --workspace

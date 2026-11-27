@@ -1,0 +1,9 @@
+[package]
+name = "fra_math"
+version = "0.1.0"
+description = "Saphire FRA arithmetic: pricing, rounding, day counts and period dates. no_std, no Solana deps."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]

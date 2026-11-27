@@ -6,9 +6,10 @@ Instruction cards and account cards for the FRA program. Read the two maps, then
 
 | Label | Meaning |
 | --- | --- |
-| `A` `B` `C` | Owning segment: A Market & Reserve (Ritam) · B Positions (Liam) · C Fixing & Settlement (Greg) |
+| `A` `B` `C` | Owning segment: A Market & Reserve (Ritam) · B Positions (Liam) · C Daily Rates & Settlement (Greg) |
 | `admin` `operator` `trader` `anyone` | Who signs |
 | `R` `W` `INIT` `CLOSE` | How the instruction touches an account: read · write · create · close |
+| `K` / `L` | Fixed rate agreed per position at open / realised floating rate for the period, derived on-chain from the daily rate index: `L = (index_end / index_start − 1) × 360 / days` |
 | `REQ-nn` | Requirement implemented (see Part 0 of the Program Implementation Guide) |
 | `halt-ok` `pause-ok` | Allowed while the market is Halted / the program is Paused |
 
@@ -42,7 +43,7 @@ Instruction cards and account cards for the FRA program. Read the two maps, then
 | open_position | IX-18 | B | trader | Position | TraderMargin, Reserve, Market, fee_vault |
 | open_position_signed | IX-19 | B | trader (+ operator signature) | Position, UsedNonce | TraderMargin, Reserve, Market, fee_vault |
 | close_position | IX-20 | B | trader | — | Position, TraderMargin, Reserve, Market, both vaults |
-| publish_fixing | IX-21 | C | operator | Fixing | — |
+| publish_daily_rate | IX-21 | C | operator | DailyRate | Market (rate_index, last_rate_date) |
 | settle_position | IX-22 | C | anyone | — | Position, TraderMargin, Reserve, Market, both vaults |
 | unwind_position | IX-23 | C | anyone | — | Position, TraderMargin, Reserve, Market |
 | close_used_nonce | IX-24 | B/C | trader | — | UsedNonce (close) |
@@ -68,14 +69,15 @@ pub struct OperatorRegistration { pub operator: Pubkey, pub active: bool, pub bu
 
 ### Market `A`
 - **Seeds** `[b"market", benchmark_id, settlement_mint, start_offset_months, tenor_months]`
-- **Created by** IX-05 · **Written by** IX-13/14 (`status`); IX-18/19/20 and IX-22/23 (`open_interest`); IX-18/19 (`position_count`) · **Read by** everything else
+- **Created by** IX-05 · **Written by** IX-13/14 (`status`); IX-18/19/20 and IX-22/23 (`open_interest`); IX-18/19 (`position_count`); IX-21 (`rate_index`, `last_rate_date`) · **Read by** everything else
 ```rust
 pub struct Market {
     pub operator: Pubkey, pub keeper: Pubkey, pub benchmark_id: u8, pub settlement_mint: Pubkey,
     pub start_offset_months: u8, pub tenor_months: u8, pub day_count_basis: u16, pub business_day_convention: u8,
     pub initial_margin_bps: u16, pub operator_commit_bps: u16, pub min_notional: u64, pub max_notional: u64,
-    pub open_interest_cap: u64, pub open_interest: u64, pub quote_validity_secs: u32, pub fixing_grace_days: u16,
-    pub early_close_fee_bps: u16, pub max_half_spread_bps: u16, pub status: MarketStatus, pub position_count: u64, pub bump: u8,
+    pub open_interest_cap: u64, pub open_interest: u64, pub quote_validity_secs: u32, pub rate_grace_days: u16,
+    pub early_close_fee_bps: u16, pub max_half_spread_bps: u16, pub status: MarketStatus, pub position_count: u64,
+    pub rate_index: u128, pub last_rate_date: i64, pub bump: u8,
 }
 pub enum MarketStatus { Active, Halted, Closed }
 ```
@@ -134,12 +136,24 @@ pub enum PositionStatus { Open, Closed, Settled, Unwound }
 pub struct UsedNonce { pub market: Pubkey, pub trader: Pubkey, pub nonce: u64, pub position: Pubkey, pub bump: u8 }
 ```
 
-### Fixing `C`
-- **Seeds** `[b"fixing", market, period_start_le, period_end_le]` · one per period per market
-- **Created by** IX-21 · never written again (REQ-83) · **Read by** IX-22; its *absence* is checked by IX-23
+### DailyRate `C`
+- **Seeds** `[b"rate", market, date_le]` · one per business day per market · `date` is 00:00 UTC of the print's calendar day
+- **Created by** IX-21 · never written again (REQ-83) · **Read by** IX-22 (two checkpoints: period_start and period_end); the *absence* of the period_end checkpoint is checked by IX-23
 ```rust
-pub struct Fixing { pub market: Pubkey, pub period_start: i64, pub period_end: i64, pub rate: u64, pub published_at: i64, pub source_hash: [u8; 32], pub bump: u8 }
+pub struct DailyRate {
+    pub market: Pubkey,
+    pub date: i64,            // 00:00 UTC of the business day
+    pub rate: u64,            // SOFR print, scaled 10⁴ per percent
+    pub days_applied: u8,     // calendar days this print accrues for (1; 3 over a weekend; more over holidays)
+    pub index_before: u128,   // Market.rate_index when this print was applied
+    pub index_after: u128,    // index_before × (1 + rate × days_applied / 360), scale 10¹⁸
+    pub published_at: i64,
+    pub bump: u8,
+}
 ```
+- The **rate index** is a cumulative compounding factor, scale 10¹⁸, starting at 10¹⁸ when the market is created. `Market.rate_index` and `Market.last_rate_date` mirror the latest checkpoint.
+- Prints must be sequential: `date == next business day after Market.last_rate_date` (gaps refused); several days may be published in one transaction by repeating the instruction.
+- `L` for a position = `(index_after(period_end) × 10¹⁸ / index_after(period_start) − 10¹⁸) × 360 / days`, computed by `fra_math::period_rate_from_index`. Every input is on-chain; anyone can recompute.
 
 ### `fra_math` (crate, `B` owns, all call)
 
@@ -150,6 +164,9 @@ pub struct Fixing { pub market: Pubkey, pub period_start: i64, pub period_end: i
 | `year_fraction_days(start, end) -> u16` | `(end − start) / 86_400`, > 0 |
 | `rate_pnl(notional, rate_a, rate_b, days) -> i128` | `notional · (rate_a − rate_b) · days / (10⁶ · 360)`, divide last, truncate toward zero |
 | `derive_period(ts, offset_m, tenor_m, cal) -> (i64, i64)` | add months, Modified Following each date; `cal` trait, weekend-only in v1 |
+| `next_business_day(date, cal) -> i64` and `days_until(date, next) -> u8` | sequencing and `days_applied` for daily prints |
+| `compound_index(index_before: u128, rate: u64, days_applied: u8) -> u128` | `index × (10¹⁸ + rate × days_applied × 10¹⁸ / (10⁶ × 360)) / 10¹⁸`, u256 intermediate via `ruint` or two-limb mul, truncate |
+| `period_rate_from_index(index_start: u128, index_end: u128, days: u16) -> u64` | `((index_end × 10¹⁸ / index_start) − 10¹⁸) × 360 × 10⁶ / (days × 10¹⁸)`, truncate; result scaled 10⁴ per percent |
 
 ---
 
@@ -223,10 +240,10 @@ Implements: REQ-01–06
 - `initial_margin_bps > 0 && operator_commit_bps > 0` (REQ-04)
 - `min_notional <= max_notional` (REQ-05)
 - `benchmark_id`, `day_count_basis`, `business_day_convention` in supported set
-- `open_interest_cap`, `quote_validity_secs`, `fixing_grace_days`, `max_half_spread_bps` > 0
+- `open_interest_cap`, `quote_validity_secs`, `rate_grace_days`, `max_half_spread_bps` > 0
 
 **Logic**
-1. Write Market: `operator = signer`, `keeper`, params, `status = Active`, `open_interest = 0`, `position_count = 0`
+1. Write Market: `operator = signer`, `keeper`, params, `status = Active`, `open_interest = 0`, `position_count = 0`, `rate_index = 10¹⁸`, `last_rate_date = params.index_start_date` (the business day before the first print)
 2. Reserve: `market`, `vault = reserve_vault`, `balance = committed = 0`
 3. Quote: `market`, zeroed, `epoch = 0` (unpublished)
 4. Emit `MarketCreated`
@@ -450,18 +467,26 @@ Implements: REQ-64–68, 74
 
 ## Instruction cards — Segment C
 
-### IX-21 `publish_fixing(period_start: i64, period_end: i64, rate: u64, source_hash: [u8; 32])` `C` `operator` `halt-ok` `pause-ok`
-Implements: REQ-51–55
+### IX-21 `publish_daily_rate(date: i64, rate: u64, days_applied: u8)` `C` `operator` `halt-ok` `pause-ok`
+Implements: REQ-51–55 (restated for daily prints: one immutable print per business day, operator-only, sequential, bounded)
 
-**Accounts** · `operator` signer, payer, `market.operator == operator` · `config` R · `market` R · `fixing` INIT, seeds `[b"fixing", market, period_start_le, period_end_le]` · `clock`, `system_program`
+**Accounts** · `operator` signer, payer, `market.operator == operator` · `config` R · `market` W (`rate_index`, `last_rate_date`) · `daily_rate` INIT, seeds `[b"rate", market, date_le]` · `clock`, `system_program`
 
-**Validation** · `now >= period_end` (REQ-54) · `period_end > period_start` · `0 < rate <= config.rate_ceiling` (REQ-55). Not checked: that any position has this period — a fixing is a market fact.
+**Validation**
+- `date == next_business_day(market.last_rate_date, cal)` → `RateDateNotNext` (no gaps, no duplicates — duplicate also fails at init)
+- `days_applied == days_until(date, next_business_day(date, cal))` → `InvalidParams` (1 on a normal day, 3 on a Friday)
+- `date + days_applied × 86_400 <= now` → `RateDateInFuture` (the print must be for a completed accrual window)
+- `0 < rate <= config.rate_ceiling` → `RateOutOfRange`
 
-**Logic** · write fields, `published_at = now` · emit `FixingPublished`
+**Logic**
+1. `index_after = fra_math::compound_index(market.rate_index, rate, days_applied)`
+2. Write DailyRate `{ market, date, rate, days_applied, index_before: market.rate_index, index_after, published_at: now }`
+3. `market.rate_index = index_after`; `market.last_rate_date = date`
+4. Emit `DailyRatePublished`
 
-**Errors** · `NotOperator` (REQ-52), `FixingExists` (init, REQ-53), `PeriodNotEnded`, `RateOutOfRange`, `InvalidParams`
+**Errors** · `NotOperator`, `RateDateNotNext`, `RateDateInFuture`, `RateOutOfRange`, `InvalidParams`
 
-**Off-chain** · compound NY Fed SOFR prints over the period, ACT/360, annualise; hash the input set into `source_hash`.
+**Off-chain** · operator cron reads the NY Fed SOFR print each business day and submits it; a missed day is caught up by submitting the missing days in order in one transaction. Traders mark to market from `Market.rate_index` without any on-chain work.
 
 ### IX-22 `settle_position()` `C` `anyone` `halt-ok` `pause-ok`
 Implements: REQ-56–63, 74
@@ -470,7 +495,8 @@ Implements: REQ-56–63, 74
 - `payer` · signer (anyone)
 - `market` W
 - `reserve` W · `reserve_vault` W
-- `fixing` R · seeds `[b"fixing", market, position.period_start_le, position.period_end_le]`
+- `rate_start` R · DailyRate, seeds `[b"rate", market, position.period_start_le]`
+- `rate_end` R · DailyRate, seeds `[b"rate", market, position.period_end_le]`
 - `position` W · seeds `[b"position", market, position.trader, position.nonce_le]`, `has_one = market`
 - `trader_margin` W · seeds `[b"margin", market, position.trader]` · `margin_vault` W
 - `clock`, `token_program`
@@ -478,26 +504,26 @@ Implements: REQ-56–63, 74
 **Validation** · `status == Open` (REQ-62) · `now >= period_end`. No halt, pause or eligibility check (REQ-63, 74).
 
 **Logic**
-1. `pnl = ±rate_pnl(N, fixing.rate, K, days)`; `settled = clamp(pnl, −locked_margin, +committed_reserve)` (REQ-58)
+1. `L = fra_math::period_rate_from_index(rate_start.index_after, rate_end.index_after, days)`; `pnl = ±rate_pnl(N, L, K, days)`; `settled = clamp(pnl, −locked_margin, +committed_reserve)` (REQ-58)
 2. `settled > 0`: `reserve_vault → margin_vault`; `< 0`: `margin_vault → reserve_vault`; `== 0`: none (REQ-56/57)
 3. `locked −= locked_margin`; `open_positions −= 1`; `committed −= committed_reserve`; `open_interest −= N` (REQ-59/60)
 4. Mirror asserts
 5. `status = Settled`; `settled_amount`; `settled_at = now` · emit `PositionSettled`
 
-**Errors** · `NotOpen`, `PeriodNotEnded`, `FixingMissing` / `FixingMismatch` (REQ-61), `MirrorMismatch`
+**Errors** · `NotOpen`, `PeriodNotEnded`, `RateCheckpointMissing` (REQ-61, either checkpoint absent — seeds enforce the match), `MirrorMismatch`
 
-**Off-chain** · keeper cron lists Open positions past `period_end` and submits this.
+**Off-chain** · keeper cron lists Open positions past `period_end` whose `period_end` checkpoint exists and submits this. Note `period_start`'s checkpoint is the print *for* that day, so `index_after(period_start)` already includes period_start's accrual — the window is (period_start, period_end], matching ACT/360 compounding in arrears.
 
 ### IX-23 `unwind_position()` `C` `anyone` `halt-ok` `pause-ok`
 Implements: REQ-69–71, 74
 
-**Accounts** · `payer` signer · `market` W · `reserve` W · `position` W, `has_one = market` · `trader_margin` W, seeds `[b"margin", market, position.trader]` · `fixing_address` unchecked, must equal the derived Fixing PDA for the position's period · `clock`
+**Accounts** · `payer` signer · `market` W · `reserve` W · `position` W, `has_one = market` · `trader_margin` W, seeds `[b"margin", market, position.trader]` · `rate_end_address` unchecked, must equal the derived DailyRate PDA for `position.period_end` · `clock`
 
-**Validation** · `status == Open` · `now >= period_end + fixing_grace_days · 86_400` (REQ-70) · `fixing_address` has zero lamports and no data (REQ-71)
+**Validation** · `status == Open` · `now >= period_end + rate_grace_days · 86_400` (REQ-70) · `rate_end_address` has zero lamports and no data (REQ-71)
 
 **Logic** · release `locked_margin`, `committed_reserve`, `open_interest`; no token transfer (REQ-69) · `status = Unwound`; `settled_amount = 0`; `settled_at = now` · emit `PositionUnwound`
 
-**Errors** · `NotOpen`, `GraceNotElapsed`, `FixingExists`, `BadFixingAddress`
+**Errors** · `NotOpen`, `GraceNotElapsed`, `RateCheckpointExists`, `BadRateCheckpointAddress`
 
 ### IX-24 `close_used_nonce()` `B/C` `trader` *(optional)*
 
@@ -511,22 +537,82 @@ Implements: REQ-69–71, 74
 
 ---
 
-## Error enum
+## Errors
+
+One enum, grouped by section so each refusal has a home. Codes are assigned in this order; the comment on each variant names the requirement it enforces.
 
 ```rust
 #[error_code]
 pub enum FraError {
-    NotAuthority, NotOperator, NotTrader, NotEligible,
-    OperatorInactive, MarketExists, MarketClosed, MarketHalted, MarketNotHalted, InvalidTransition, ProgramPaused,
-    InvalidParams, WrongMint, MirrorMismatch,
-    InsufficientWithdrawable, InsufficientFreeMargin, InsufficientReserve,
-    QuoteStale, SpreadTooWide, RateOutOfRange, NotionalOutOfBounds, OpenInterestCap,
-    MissingSignature, BadSigner, MessageMismatch, OfferExpired, PeriodStarted, BadPeriod, NonceUsed,
-    NotOpen, UseSettle, PeriodNotEnded, FixingExists, FixingMissing, FixingMismatch, GraceNotElapsed, BadFixingAddress,
-    PositionStillOpen, MathOverflow,
+    // ── Access: wrong signer ──────────────────────────────────────── A, B, C
+    #[msg("Signer is not Config.authority")]            NotAuthority,       // REQ-02a, 02b, 02d
+    #[msg("Signer is not Market.operator")]             NotOperator,        // REQ-08, 11, 13, 19, 52, 73
+    #[msg("Signer is not the owner of this margin/position")] NotTrader,   // REQ-25, 65
+    #[msg("Trader is not eligible for this market")]    NotEligible,        // REQ-21, 35
+
+    // ── Program and market state ──────────────────────────────────── A
+    #[msg("Operator is not registered or is inactive")] OperatorInactive,   // REQ-02, 02c
+    #[msg("Market with these seeds already exists")]    MarketExists,       // REQ-03
+    #[msg("Market is Closed")]                          MarketClosed,
+    #[msg("Market is Halted; opening refused")]         MarketHalted,       // REQ-41
+    #[msg("Market is not Halted")]                      MarketNotHalted,    // REQ-72
+    #[msg("Status transition not allowed")]             InvalidTransition,  // REQ-72
+    #[msg("Program is paused; opening refused")]        ProgramPaused,      // REQ-41, 74a
+
+    // ── Parameters, mints, accounting ─────────────────────────────── A, B, C
+    #[msg("Parameter out of range or zero")]            InvalidParams,      // REQ-04, 05, 22
+    #[msg("Token account mint or owner mismatch")]      WrongMint,
+    #[msg("Balance mirror differs from vault amount")]  MirrorMismatch,     // REQ-75
+    #[msg("Checked arithmetic overflow")]               MathOverflow,
+
+    // ── Reserve and margin ────────────────────────────────────────── A, B
+    #[msg("Withdrawal exceeds balance minus committed")] InsufficientWithdrawable, // REQ-10
+    #[msg("Free margin below lock plus fee, or withdrawal")] InsufficientFreeMargin, // REQ-24, 37
+    #[msg("Uncommitted reserve below required commit")] InsufficientReserve,      // REQ-38
+
+    // ── Quote and opening ─────────────────────────────────────────── A, B
+    #[msg("Quote unpublished or older than validity")]  QuoteStale,         // REQ-36, 66
+    #[msg("Half-spread above market maximum")]          SpreadTooWide,      // REQ-15
+    #[msg("Rate is zero or above Config.rate_ceiling")] RateOutOfRange,     // REQ-16, 55 (quote mid and daily print)
+    #[msg("Notional outside market or quote bounds")]   NotionalOutOfBounds,// REQ-39
+    #[msg("Open interest cap would be exceeded")]       OpenInterestCap,    // REQ-40
+
+    // ── Signed deal (IX-19) ───────────────────────────────────────── B
+    #[msg("No Ed25519 instruction precedes this one")]  MissingSignature,   // REQ-42–50
+    #[msg("Signature is not from Market.operator")]     BadSigner,
+    #[msg("Signed message differs from the submitted deal")] MessageMismatch,
+    #[msg("Deal has expired")]                          OfferExpired,
+    #[msg("Deal submitted at or after period_start")]   PeriodStarted,
+    #[msg("Period dates inconsistent with offset/tenor")] BadPeriod,
+    #[msg("Deal nonce already used")]                   NonceUsed,
+
+    // ── Position lifecycle ────────────────────────────────────────── B, C
+    #[msg("Position is not Open")]                      NotOpen,            // REQ-62, 66, 84, 85
+    #[msg("Period has ended; use settle_position")]     UseSettle,          // REQ-67
+    #[msg("Period has not ended")]                      PeriodNotEnded,     // REQ-54
+    #[msg("UsedNonce cannot be closed while Open")]     PositionStillOpen,
+
+    // ── Daily rates and settlement ────────────────────────────────── C
+    #[msg("Date is not the next business day after the last print")] RateDateNotNext,   // REQ-53
+    #[msg("Print's accrual window has not completed")]  RateDateInFuture,       // REQ-54
+    #[msg("Rate checkpoint for period end already exists")] RateCheckpointExists, // REQ-71
+    #[msg("Rate checkpoint for period start or end is missing")] RateCheckpointMissing, // REQ-61
+    #[msg("Grace period after period_end has not elapsed")] GraceNotElapsed,    // REQ-70
+    #[msg("Checkpoint address is not the derived PDA")] BadRateCheckpointAddress, // REQ-71
 }
 ```
 
+| Group | Raised by | Owner |
+| --- | --- | --- |
+| Access | every instruction with a signer constraint | A, B, C |
+| Program and market state | IX-04, 05, 08, 13–16, 18, 19 | A |
+| Parameters, mints, accounting | IX-01, 05–08, 12, 17–20, 22 | A, B, C |
+| Reserve and margin | IX-07, 17, 18, 19 | A, B |
+| Quote and opening | IX-08, 18, 19, 20 | A, B |
+| Signed deal | IX-19 | B |
+| Position lifecycle | IX-20, 22, 23, 24 | B, C |
+| Daily rates and settlement | IX-21, 22, 23 | C |
+
 ## Invariants (fuzz suite, Segment C)
 
-After every instruction: `Σ margin balances + reserve.balance + fee_vault == program-held USDC` (REQ-75) · `locked <= balance`, `committed <= balance` (76, 77) · `locked == Σ locked_margin`, `committed == Σ committed_reserve`, `open_interest == Σ notional` over Open positions (78–80) · no position moves backwards or terminates twice (84, 85) · no fixing or position terms change after creation (82, 83).
+After every instruction: `Σ margin balances + reserve.balance + fee_vault == program-held USDC` (REQ-75) · `locked <= balance`, `committed <= balance` (76, 77) · `locked == Σ locked_margin`, `committed == Σ committed_reserve`, `open_interest == Σ notional` over Open positions (78–80) · no position moves backwards or terminates twice (84, 85) · no daily-rate checkpoint or position terms change after creation (82, 83); `Market.rate_index == index_after` of the latest checkpoint.

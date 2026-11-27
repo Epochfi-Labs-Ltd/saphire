@@ -1,0 +1,14 @@
+[package]
+name = "saphire-keeper"
+version = "0.1.0"
+description = "Saphire keeper: settle/unwind cron and daily SOFR print script (Segment C). Not yet implemented."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "saphire-keeper"
+path = "src/main.rs"
+
+[dependencies]

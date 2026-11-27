@@ -1,6 +1,5 @@
 //! IX-11 `init_trader_margin` · trader · B.
 // TODO(B): implement these tests and remove the #[ignore]s once IX-11 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// TraderMargin (zeros) and margin_vault (authority = TraderMargin) created.
 #[test]

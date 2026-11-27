@@ -45,15 +45,6 @@ pub enum Side {
     ReceiveFixed,
 }
 
-impl From<Side> for fra_math::Side {
-    fn from(side: Side) -> Self {
-        match side {
-            Side::PayFixed => fra_math::Side::PayFixed,
-            Side::ReceiveFixed => fra_math::Side::ReceiveFixed,
-        }
-    }
-}
-
 /// How a position was priced.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, InitSpace)]
 pub enum Origin {

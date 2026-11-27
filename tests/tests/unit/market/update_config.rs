@@ -1,6 +1,5 @@
 //! IX-02 `update_config` · admin · optional · A.
 // TODO(A): implement these tests and remove the #[ignore]s once IX-02 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// Admin overwrites protocol_fee_bps and rate_ceiling.
 #[test]

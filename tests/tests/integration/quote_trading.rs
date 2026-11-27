@@ -10,8 +10,8 @@ fn open_at_quote_from_fresh_market() {
     todo!("flow: ready_market + ready_trader + open_test_position")
 }
 
-/// open_position → close_position early: locks, commit, open interest and
-/// settlement_fee released; PnL moved between margin and reserve vaults.
+/// open_position → close_position early: locks, commit and open interest
+/// released; PnL moved between margin and reserve vaults.
 #[test]
 #[ignore = "TODO(B): needs IX-18/20"]
 fn open_then_close_early_releases_everything() {

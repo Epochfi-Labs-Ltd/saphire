@@ -1,6 +1,5 @@
 //! IX-09 `admit_trader` · operator · A.
 // TODO(A): implement these tests and remove the #[ignore]s once IX-09 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// Eligibility created with market, trader, active = true.
 #[test]

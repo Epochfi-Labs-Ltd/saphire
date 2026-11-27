@@ -1,6 +1,5 @@
 //! IX-04 `deactivate_operator` · admin · A.
 // TODO(A): implement these tests and remove the #[ignore]s once IX-04 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// active = false; account kept; existing markets untouched.
 #[test]

@@ -6,8 +6,8 @@ use anchor_lang::prelude::*;
 /// +, `balance` − fee, `open_positions` +); IX-20, IX-22, IX-23 (`locked` −,
 /// `balance` ±, `open_positions` −).
 ///
-/// Invariant: `balance == margin_vault.amount`; `locked == Σ (locked_margin +
-/// settlement_fee)` over Open positions.
+/// Invariant: `balance == margin_vault.amount`; `locked == Σ locked_margin`
+/// over Open positions.
 #[account]
 #[derive(InitSpace)]
 pub struct TraderMargin {
@@ -19,12 +19,4 @@ pub struct TraderMargin {
     pub open_positions: u32,
     pub bump: u8,
     pub _reserved: [u8; 32],
-}
-
-impl TraderMargin {
-    /// `balance − locked`; `None` if the invariant `locked <= balance` is
-    /// broken.
-    pub fn free(&self) -> Option<u64> {
-        self.balance.checked_sub(self.locked)
-    }
 }

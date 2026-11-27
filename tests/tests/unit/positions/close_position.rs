@@ -1,6 +1,5 @@
 //! IX-20 `close_position` · trader · halt-ok · pause-ok · B.
 // TODO(B): implement these tests and remove the #[ignore]s once IX-20 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// Net PnL minus early-close fee transferred; locks released; status Closed.
 #[test]
@@ -56,11 +55,4 @@ fn allowed_while_market_halted() {
 #[ignore = "TODO(B): IX-20 not implemented"]
 fn allowed_while_program_paused() {
     todo!("IX-20: allowed_while_program_paused")
-}
-
-/// Early close releases settlement_fee from locked; no token transfer for it.
-#[test]
-#[ignore = "TODO(B): IX-20 not implemented"]
-fn releases_settlement_fee_to_trader() {
-    todo!("IX-20: releases_settlement_fee_to_trader")
 }

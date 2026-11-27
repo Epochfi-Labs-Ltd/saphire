@@ -15,13 +15,3 @@ pub struct Quote {
     pub bump: u8,
     pub _reserved: [u8; 32],
 }
-
-impl Quote {
-    /// Fresh when `epoch > 0` and `now − published_at <= validity_secs`.
-    pub fn is_fresh(&self, now: i64, validity_secs: u32) -> bool {
-        self.epoch > 0
-            && now
-                .checked_sub(self.published_at)
-                .is_some_and(|age| age <= i64::from(validity_secs))
-    }
-}

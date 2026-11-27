@@ -1,6 +1,5 @@
 //! IX-10 `suspend_trader` · operator · A.
 // TODO(A): implement these tests and remove the #[ignore]s once IX-10 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// active = false; margin and positions untouched (REQ-18).
 #[test]

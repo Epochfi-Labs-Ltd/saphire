@@ -27,17 +27,3 @@ pub struct DailyRate {
     pub bump: u8,
     pub _reserved: [u8; 32],
 }
-
-impl DailyRate {
-    /// `[b"rate", market, date_le]`.
-    pub fn pda(market: &Pubkey, date: i64) -> (Pubkey, u8) {
-        Pubkey::find_program_address(
-            &[
-                crate::constants::SEED_RATE,
-                market.as_ref(),
-                &date.to_le_bytes(),
-            ],
-            &crate::ID,
-        )
-    }
-}

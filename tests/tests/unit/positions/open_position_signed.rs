@@ -1,6 +1,5 @@
 //! IX-19 `open_position_signed` · trader + operator signature (DECISION PENDING) · B.
 // TODO(B): implement these tests and remove the #[ignore]s once IX-19 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// Position (origin Rfq, K = deal.fixed_rate) and UsedNonce created.
 #[test]
@@ -70,11 +69,4 @@ fn rejects_replayed_nonce() {
 #[ignore = "TODO(B): IX-19 not implemented"]
 fn rejects_ix18_checks() {
     todo!("IX-19: rejects_ix18_checks")
-}
-
-/// Same settlement-fee lock as IX-18.
-#[test]
-#[ignore = "TODO(B): IX-19 not implemented"]
-fn locks_settlement_fee() {
-    todo!("IX-19: locks_settlement_fee")
 }

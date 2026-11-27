@@ -1,6 +1,5 @@
 //! IX-18 `open_position` · trader · B.
 // TODO(B): implement these tests and remove the #[ignore]s once IX-18 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// Position created (origin Quote); K, period, locks, commit, fee, OI, position_count updated.
 #[test]
@@ -84,18 +83,4 @@ fn rejects_insufficient_free_margin() {
 #[ignore = "TODO(B): IX-18 not implemented"]
 fn rejects_insufficient_reserve() {
     todo!("IX-18: rejects_insufficient_reserve")
-}
-
-/// TraderMargin.locked += lock + settlement_fee; Position.settlement_fee = Market.settlement_fee.
-#[test]
-#[ignore = "TODO(B): IX-18 not implemented"]
-fn locks_settlement_fee() {
-    todo!("IX-18: locks_settlement_fee")
-}
-
-/// InsufficientFreeMargin: free >= lock + fee but < lock + fee + settlement_fee.
-#[test]
-#[ignore = "TODO(B): IX-18 not implemented"]
-fn rejects_free_margin_below_lock_fee_and_settlement_fee() {
-    todo!("IX-18: rejects_free_margin_below_lock_fee_and_settlement_fee")
 }

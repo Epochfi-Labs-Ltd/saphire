@@ -1,6 +1,5 @@
 //! IX-23 `unwind_position` · anyone · halt-ok · pause-ok · C.
 // TODO(C): implement these tests and remove the #[ignore]s once IX-23 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// Locks, commit, OI released; no transfer; status Unwound (REQ-69).
 #[test]
@@ -50,18 +49,4 @@ fn allowed_while_market_halted() {
 #[ignore = "TODO(C): IX-23 not implemented"]
 fn allowed_while_program_paused() {
     todo!("IX-23: allowed_while_program_paused")
-}
-
-/// margin_vault -> payer_token_account, position.settlement_fee; no settlement transfer.
-#[test]
-#[ignore = "TODO(C): IX-23 not implemented"]
-fn cranker_receives_settlement_fee() {
-    todo!("IX-23: cranker_receives_settlement_fee")
-}
-
-/// WrongMint: payer_token_account mint != settlement mint, or owner != payer.
-#[test]
-#[ignore = "TODO(C): IX-23 not implemented"]
-fn rejects_payer_token_account_wrong_mint_or_owner() {
-    todo!("IX-23: rejects_payer_token_account_wrong_mint_or_owner")
 }

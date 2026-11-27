@@ -1,6 +1,5 @@
 //! IX-22 `settle_position` · anyone · halt-ok · pause-ok · C.
 // TODO(C): implement these tests and remove the #[ignore]s once IX-22 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// L derived from the period_start/period_end checkpoints; reserve pays trader;
 /// locks released; status Settled.
@@ -94,25 +93,4 @@ fn allowed_while_market_halted() {
 #[ignore = "TODO(C): IX-22 not implemented"]
 fn allowed_while_program_paused() {
     todo!("IX-22: allowed_while_program_paused")
-}
-
-/// margin_vault -> payer_token_account, position.settlement_fee; locked released.
-#[test]
-#[ignore = "TODO(C): IX-22 not implemented"]
-fn cranker_receives_settlement_fee() {
-    todo!("IX-22: cranker_receives_settlement_fee")
-}
-
-/// Market with settlement_fee = 0: no bounty transfer.
-#[test]
-#[ignore = "TODO(C): IX-22 not implemented"]
-fn zero_settlement_fee_moves_no_bounty() {
-    todo!("IX-22: zero_settlement_fee_moves_no_bounty")
-}
-
-/// WrongMint: payer_token_account mint != settlement mint, or owner != payer.
-#[test]
-#[ignore = "TODO(C): IX-22 not implemented"]
-fn rejects_payer_token_account_wrong_mint_or_owner() {
-    todo!("IX-22: rejects_payer_token_account_wrong_mint_or_owner")
 }

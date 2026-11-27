@@ -1,7 +1,7 @@
 [package]
 name = "saphire-tests"
 version = "0.1.0"
-description = "Saphire tests: shared LiteSVM fixture and mocks (src/), per-instruction unit tests with mocked state (tests/unit) and multi-instruction integration tests (tests/integration)."
+description = "Saphire tests: shared LiteSVM fixture (src/), per-instruction unit tests (tests/unit) and multi-instruction integration tests (tests/integration)."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -9,15 +9,9 @@ publish = false
 
 [dependencies]
 anchor-lang = { workspace = true }
-anchor-spl = { workspace = true }
-fra_math = { workspace = true }
 saphire = { workspace = true }
-saphire-client = { workspace = true }
 litesvm = { workspace = true }
-solana-account = "4"
-solana-instruction-error = "2"
 solana-keypair = { workspace = true }
 solana-message = { workspace = true }
 solana-signer = { workspace = true }
 solana-transaction = { workspace = true }
-solana-transaction-error = "3"

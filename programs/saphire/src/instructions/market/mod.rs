@@ -13,7 +13,6 @@ pub mod resume_market;
 pub mod resume_program;
 pub mod suspend_trader;
 pub mod update_config;
-pub mod withdraw_fees;
 pub mod withdraw_reserve;
 
 pub use admit_trader::*;
@@ -29,5 +28,4 @@ pub use resume_market::*;
 pub use resume_program::*;
 pub use suspend_trader::*;
 pub use update_config::*;
-pub use withdraw_fees::*;
 pub use withdraw_reserve::*;

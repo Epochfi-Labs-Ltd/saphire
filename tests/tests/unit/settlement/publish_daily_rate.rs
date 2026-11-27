@@ -1,6 +1,5 @@
 //! IX-21 `publish_daily_rate` · operator · halt-ok · pause-ok · C.
 // TODO(C): implement these tests and remove the #[ignore]s once IX-21 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// DailyRate written (index_before = old Market.rate_index, index_after =
 /// compound_index(...)); Market.rate_index and last_rate_date advance.

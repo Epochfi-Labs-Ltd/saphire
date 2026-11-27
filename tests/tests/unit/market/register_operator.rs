@@ -1,6 +1,5 @@
 //! IX-03 `register_operator` · admin · A.
 // TODO(A): implement these tests and remove the #[ignore]s once IX-03 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// OperatorRegistration created with operator and active = true.
 #[test]

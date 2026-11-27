@@ -16,11 +16,3 @@ pub struct Reserve {
     pub bump: u8,
     pub _reserved: [u8; 32],
 }
-
-impl Reserve {
-    /// `balance − committed`; `None` if the invariant `committed <= balance`
-    /// is broken.
-    pub fn withdrawable(&self) -> Option<u64> {
-        self.balance.checked_sub(self.committed)
-    }
-}

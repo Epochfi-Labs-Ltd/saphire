@@ -1,6 +1,5 @@
 //! IX-07 `withdraw_reserve` · operator · halt-ok · pause-ok · A.
 // TODO(A): implement these tests and remove the #[ignore]s once IX-07 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// Tokens move to operator; reserve.balance decremented; mirror holds.
 #[test]

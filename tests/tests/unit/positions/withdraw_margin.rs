@@ -1,6 +1,5 @@
 //! IX-17 `withdraw_margin` · trader · halt-ok · pause-ok · B.
 // TODO(B): implement these tests and remove the #[ignore]s once IX-17 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// Tokens move to trader; balance decremented; mirror holds.
 #[test]

@@ -1,6 +1,5 @@
 //! IX-13 `halt_market` · operator · A.
 // TODO(A): implement these tests and remove the #[ignore]s once IX-13 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// status Active -> Halted.
 #[test]

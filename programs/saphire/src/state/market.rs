@@ -28,13 +28,9 @@ pub struct Market {
     pub rate_grace_days: u16,
     pub early_close_fee_bps: u16,
     pub max_half_spread_bps: u16,
-    /// Flat settlement fee per position, settlement-mint base units. Locked
-    /// from margin at open, paid to whoever cranks settle/unwind, released
-    /// on early close. 0 = no crank bounty. Not on the cards yet; see docs/skeleton.md "Fee additions".
-    pub settlement_fee: u64,
     pub status: MarketStatus,
     pub position_count: u64,
-    /// Cumulative compounding factor, scale 10^18 (`INDEX_SCALE`); starts
+    /// Cumulative compounding factor, scale 10^18; starts
     /// at 10^18. Mirrors the latest `DailyRate.index_after`.
     pub rate_index: u128,
     /// `date` of the latest `DailyRate`; initialised to

@@ -1,5 +1,5 @@
 //! Segment A: config, operators, markets, reserve, quotes, eligibility,
-//! halt/pause, fees.
+//! halt/pause.
 
 mod admit_trader; // IX-09
 mod create_market; // IX-05
@@ -14,5 +14,4 @@ mod resume_market; // IX-14
 mod resume_program; // IX-16
 mod suspend_trader; // IX-10
 mod update_config; // IX-02
-mod withdraw_fees; // IX-25
 mod withdraw_reserve; // IX-07

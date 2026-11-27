@@ -3,16 +3,11 @@
 //! Specification: README.md and docs/implementation.md. One handler per
 //! instruction card; the mapping IX-nn -> file is in docs/skeleton.md.
 
-pub mod constants;
-pub mod errors;
-pub mod events;
 pub mod instructions;
 pub mod state;
 
 use anchor_lang::prelude::*;
 
-pub use constants::*;
-pub use errors::FraError;
 pub use instructions::*;
 pub use state::*;
 
@@ -114,11 +109,6 @@ pub mod saphire {
     /// IX-16 · admin
     pub fn resume_program(ctx: Context<ResumeProgram>) -> Result<()> {
         market::resume_program::handle_resume_program(ctx)
-    }
-
-    /// IX-25 · admin · pause-ok (not on the cards yet)
-    pub fn withdraw_fees(ctx: Context<WithdrawFees>, amount: u64) -> Result<()> {
-        market::withdraw_fees::handle_withdraw_fees(ctx, amount)
     }
 
     // ── Segment B — Positions ──────────────────────────────────────────────

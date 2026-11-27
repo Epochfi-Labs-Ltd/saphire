@@ -1,6 +1,5 @@
 //! IX-05 `create_market` · operator · A.
 // TODO(A): implement these tests and remove the #[ignore]s once IX-05 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// Market (rate_index = 10^18, last_rate_date = index_start_date), Reserve,
 /// reserve_vault and Quote (epoch 0) created.
@@ -57,11 +56,4 @@ fn rejects_unsupported_conventions() {
 #[ignore = "TODO(A): IX-05 not implemented"]
 fn rejects_zero_caps_and_windows() {
     todo!("IX-05: rejects_zero_caps_and_windows")
-}
-
-/// Market.settlement_fee = params.settlement_fee; 0 is allowed (no crank bounty).
-#[test]
-#[ignore = "TODO(A): IX-05 not implemented"]
-fn stores_settlement_fee() {
-    todo!("IX-05: stores_settlement_fee")
 }

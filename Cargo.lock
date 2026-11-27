@@ -2218,22 +2218,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "saphire-client"
-version = "0.1.0"
-dependencies = [
- "borsh",
- "num-derive",
- "num-traits",
- "solana-account",
- "solana-account-info",
- "solana-address 2.6.1",
- "solana-cpi",
- "solana-instruction",
- "solana-program-error",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "saphire-keeper"
 version = "0.1.0"
 
@@ -2242,18 +2226,12 @@ name = "saphire-tests"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
- "anchor-spl",
- "fra_math",
  "litesvm",
  "saphire",
- "saphire-client",
- "solana-account",
- "solana-instruction-error",
  "solana-keypair",
  "solana-message",
  "solana-signer",
  "solana-transaction",
- "solana-transaction-error",
 ]
 
 [[package]]

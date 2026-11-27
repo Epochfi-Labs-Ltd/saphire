@@ -1,6 +1,5 @@
 //! IX-08 `publish_quote` · operator · halt-ok · A.
 // TODO(A): implement these tests and remove the #[ignore]s once IX-08 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// Fields overwritten, published_at = now, epoch += 1 (REQ-14).
 #[test]

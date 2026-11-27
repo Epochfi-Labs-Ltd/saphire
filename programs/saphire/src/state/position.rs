@@ -26,10 +26,6 @@ pub struct Position {
     pub locked_margin: u64,
     pub committed_reserve: u64,
     pub fee_paid: u64,
-    /// `Market.settlement_fee` at open, held in `TraderMargin.locked` until
-    /// settle/unwind (paid to the cranker) or early close (released).
-    /// Not on the cards yet; see docs/skeleton.md "Fee additions".
-    pub settlement_fee: u64,
     pub origin: Origin,
     pub status: PositionStatus,
     /// Trader's view: > 0 paid to trader, < 0 paid to reserve.

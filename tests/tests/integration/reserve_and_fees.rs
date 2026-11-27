@@ -1,4 +1,4 @@
-//! Reserve and fee flows: IX-06, 07, 18 and 25.
+//! Reserve and fee flows: IX-06, 07 and 18.
 // TODO(A/B): implement once the handlers on each path land.
 
 /// With a position open, withdraw_reserve is capped at balance − committed;
@@ -9,12 +9,11 @@ fn reserve_withdrawal_respects_commitments() {
     todo!("flow: fund, open, withdraw_reserve(too much) fails, close, withdraw all")
 }
 
-/// Protocol fees taken at open land in fee_vault and withdraw_fees pays them
-/// out to the admin's destination.
+/// Protocol fees taken at open land in fee_vault.
 #[test]
-#[ignore = "TODO(A/B): needs IX-18/25"]
-fn protocol_fees_accrue_and_withdraw() {
-    todo!("flow: open N positions, fee_vault == Σ fee_paid, withdraw_fees(all)")
+#[ignore = "TODO(A/B): needs IX-18"]
+fn protocol_fees_accrue() {
+    todo!("flow: open N positions, fee_vault == Σ fee_paid")
 }
 
 /// Program-held tokens equal Σ margin balances + reserve.balance + fee_vault

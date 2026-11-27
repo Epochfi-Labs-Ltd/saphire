@@ -1,6 +1,5 @@
 //! IX-12 `deposit_margin` · trader · halt-ok · pause-ok · B.
 // TODO(B): implement these tests and remove the #[ignore]s once IX-12 is implemented.
-// Build state with the `mock_*` builders (saphire_tests::mock), not the setup_* chains.
 
 /// Tokens move to margin_vault; balance == vault amount.
 #[test]

@@ -1,6 +1,9 @@
 # Build, fmt, clippy and tests with the toolchain pinned in docs/toolchain.md.
 name: ci
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
